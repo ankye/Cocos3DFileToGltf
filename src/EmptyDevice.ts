@@ -1,4 +1,3 @@
-/// <reference path="cocos-engine/cc.d.ts"/>
 
 export class EmptyTexture extends cc.gfx.Texture {
     public initialize(info: Readonly<cc.gfx.TextureInfo> | Readonly<cc.gfx.TextureViewInfo>, isSwapchainTexture?: boolean) {

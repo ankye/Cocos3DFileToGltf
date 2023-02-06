@@ -1,4 +1,5 @@
-import jsdom from "jsdom";
+// import globalJsdom from "jsdom-global";
+import { JSDOM } from "jsdom";
 import "systemjs";
 
 declare global {
@@ -8,7 +9,7 @@ declare global {
 }
 
 if (typeof window == "undefined") {
-  const dom = new jsdom.JSDOM(`<!doctype html><html><body>  
+  const dom = new JSDOM(`<!doctype html><html><body>  
     <div id="GameDiv" cc_exact_fit_screen="true">
     <div id="Cocos3dGameContainer">
       <canvas id="GameCanvas" oncontextmenu="event.preventDefault()" tabindex="99"></canvas>
@@ -18,7 +19,7 @@ if (typeof window == "undefined") {
     referrer: "https://example.com/",
     contentType: "text/html",
     includeNodeLocations: true,
-    storageQuota: 10000000
+    storageQuota: 10000000,
   });
 
   globalThis.window = dom.window as any;
