@@ -20,6 +20,7 @@ if (typeof window == "undefined") {
     contentType: "text/html",
     includeNodeLocations: true,
     storageQuota: 10000000,
+    resources: "usable",
   });
 
   globalThis.window = dom.window as any;

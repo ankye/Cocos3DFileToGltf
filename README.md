@@ -10,7 +10,7 @@
 * Materials
 * Skins
 * ~~Animations~~
-* ~~Textures~~
+* Textures
 
 ## 安装
 下载项目后，使用```npm i```命令安装。

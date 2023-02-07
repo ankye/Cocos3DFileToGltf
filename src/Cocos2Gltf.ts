@@ -1,4 +1,4 @@
-import { Buffer, Document, Mesh, Node, Skin, TypedArray, vec3, vec4 } from '@gltf-transform/core';
+import { Buffer, Document, Material, Mesh, Node, Skin, Texture, TextureInfo, TypedArray, vec3, vec4 } from '@gltf-transform/core';
 import { gltf } from './gltf';
 
 export const CocosToGltfAttribute: Record<cc.gfx.AttributeName, gltf.AttributeName> = {
@@ -90,14 +90,59 @@ export default class Cocos2Gltf {
 
             const cocosMaterial = cocosMaterials[indexPrimitive];
             let material = materialList.find(v => v.getName() == cocosMaterial.name);
-            if (material == null) {
-                material = doc.createMaterial(cocosMaterial.name);
-                const baseColor = cocosMaterial.getProperty("mainColor") as cc.Color;
-                material.setBaseColorHex(Number.parseInt(baseColor.toHEX(), 16));
-            }
+            if (material == null)
+                material = Cocos2Gltf.createMaterial(doc, cocosMaterial);
             gltfPrimitive.setMaterial(material);
         }
         return gltfMesh;
+    }
+
+    private static createMaterial(doc: Document, cocosMaterial: cc.Material): Material {
+        const material = doc.createMaterial(cocosMaterial.name);
+        const baseColor = cocosMaterial.getProperty("mainColor") as cc.Color;
+        if (baseColor) material.setBaseColorHex(Number.parseInt(baseColor.toHEX(), 16));
+        const metallic = cocosMaterial.getProperty("material") as number;
+        if (metallic) material.setMetallicFactor(metallic);
+        const roughness = cocosMaterial.getProperty("roughness") as number;
+        if (roughness) material.setRoughnessFactor(roughness);
+
+        const baseTexture = cocosMaterial.getProperty("mainTexture") as cc.Texture2D;
+        if (baseTexture != null) {
+            const texture = Cocos2Gltf.createTexture(doc, baseTexture);
+            material.setBaseColorTexture(texture);
+            Cocos2Gltf.setTextureInof(material.getBaseColorTextureInfo(), baseTexture);
+        }
+        return material;
+    }
+
+    private static createTexture(doc: Document, baseTexture: cc.Texture2D): Texture {
+        const texture = doc.createTexture(baseTexture.name);
+        const extnameIndex = baseTexture.image.nativeUrl.lastIndexOf(".");
+        if (extnameIndex != -1) {
+            let extname = baseTexture.image.nativeUrl.substring(extnameIndex + 1);
+            if (extname.toLowerCase() != "png")
+                extname = "jpeg";
+            texture.setMimeType(`image/${extname}`);
+        }
+        texture.setImage(new Uint8Array(baseTexture.image.data["arrayBuffer"]));
+        return texture;
+    }
+
+    private static setTextureInof(textureInfo: TextureInfo, baseTexture: cc.Texture2D): void {
+        const samplerInfo = baseTexture.getSamplerInfo();
+
+        // const uv1 = cocosMaterial.getProperty("uv");
+        // textureInfo.setTexCoord();
+
+        const wrapS = TextureInfo.WrapMode[cc.Texture2D.WrapMode[baseTexture["_wrapS"]]];
+        const wrapT = TextureInfo.WrapMode[cc.Texture2D.WrapMode[baseTexture["_wrapT"]]];
+        if (wrapS) textureInfo.setWrapS(wrapS);
+        if (wrapT) textureInfo.setWrapT(wrapS);
+
+        const minFilter = TextureInfo.MinFilter[cc.gfx.Filter[samplerInfo.minFilter]];
+        if (minFilter) textureInfo.setMinFilter(minFilter);
+        const magFilter = TextureInfo.MagFilter[cc.gfx.Filter[samplerInfo.magFilter]];
+        if (magFilter) textureInfo.setMagFilter(magFilter);
     }
 
     private static createSkin(doc: Document, buffer: Buffer, meshRenderer: cc.SkinnedMeshRenderer, node: Node): Skin {

@@ -21,29 +21,26 @@ export namespace cocos {
         function downloadImage(url: string, options: any, callback: (error: Error, data?: any) => void) {
             const image = new window.Image();
 
-            // function loadCallback() {
-            //     console.log("loadCallback");
-            //     image.removeEventListener('load', loadCallback);
-            //     image.removeEventListener('error', errorCallback);
-            //     callback(null, image);
-            // }
+            function loadCallback() {
+                image.removeEventListener('load', loadCallback);
+                image.removeEventListener('error', errorCallback);
+                callback(null, image);
+            }
 
-            // function errorCallback() {
-            //     console.log("errorCallback");
-            //     image.removeEventListener('load', loadCallback);
-            //     image.removeEventListener('error', errorCallback);
-            //     callback(new Error('Load image (' + url + ') failed'));
-            // }
+            function errorCallback() {
+                image.removeEventListener('load', loadCallback);
+                image.removeEventListener('error', errorCallback);
+                callback(new Error('Load image (' + url + ') failed'));
+            }
 
-            // image.addEventListener('load', loadCallback);
-            // image.addEventListener('error', errorCallback);
+            image.addEventListener('load', loadCallback);
+            image.addEventListener('error', errorCallback);
 
-            image.decoding = 'sync';
             const arrayBuffer = io.readBinaryFileSync(getUrl(url));
             const data = Buffer.from(arrayBuffer).toString('base64');
             const ext = url.slice(url.lastIndexOf('.') + 1);
             image.src = `data:image/${ext};base64,${data}`;
-            callback(null, image);
+            image["arrayBuffer"] = arrayBuffer;
         }
 
         function downloadJson(url: string, options: any, callback: (error: Error, data?: any) => void) {
