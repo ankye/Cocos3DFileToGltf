@@ -15,7 +15,7 @@ if (typeof window == "undefined") {
       <canvas id="GameCanvas" oncontextmenu="event.preventDefault()" tabindex="99"></canvas>
     </div>
     </body></html>`, {
-    url: "https://example.org/",
+    // url: "https://example.org/",
     referrer: "https://example.com/",
     contentType: "text/html",
     includeNodeLocations: true,
