@@ -1,4 +1,5 @@
-import { Buffer, Document, Material, Mesh, Node, Skin, Texture, TextureInfo, TypedArray, vec3, vec4 } from '@gltf-transform/core';
+import { Animation, Buffer, Document, Material, Mesh, Node, Skin, Texture, TextureInfo, TypedArray, vec3, vec4 } from '@gltf-transform/core';
+import { GLTF } from "@gltf-transform/core/dist/types/gltf";
 import { gltf } from './gltf';
 
 export const CocosToGltfAttribute: Record<cc.gfx.AttributeName, gltf.AttributeName> = {
@@ -14,32 +15,59 @@ export const CocosToGltfAttribute: Record<cc.gfx.AttributeName, gltf.AttributeNa
 
 } as any;
 
-interface IMeshMap {
-    meshRenderer: cc.MeshRenderer;
-    node: Node;
+const TargetPathMap: Record<string, GLTF.AnimationChannelTargetPath> = {
+    "_position": "translation",
+    "_rotation": "rotation",
+    "_scale": "scale",
+};
+
+const TargetPathMapKeys = Object.keys(TargetPathMap);
+
+interface IComponentMap {
+    readonly meshList: {
+        meshRenderer: cc.MeshRenderer;
+        node: Node;
+    }[];
+    readonly animationList: {
+        animation: cc.Animation;
+        node: Node;
+    }[];
 }
 
 export default class Cocos2Gltf {
-    public static convert(prefab: cc.Prefab): Document {
-        const doc = new Document();
-        const scene = doc.createScene()
-        const buffer = doc.createBuffer();
+    public readonly doc = new Document();
+    public readonly scene;
+    public readonly buffer;
 
-        const meshMapList: IMeshMap[] = [];
+    public constructor() {
+        this.scene = this.doc.createScene();
+        this.buffer = this.doc.createBuffer();
+    }
+
+    public parserNodeAndMesh(prefab: cc.Prefab): this {
+        const componentMapList: IComponentMap = { meshList: [], animationList: [] };
         const nodeMapList = new Map<cc.Node, Node>();
-        Cocos2Gltf.createNodes(doc, buffer, scene as any, prefab.data, nodeMapList, meshMapList);
-        for (const meshMap of meshMapList) {
-            const mesh = Cocos2Gltf.createMesh(doc, buffer, meshMap.meshRenderer);
+        Cocos2Gltf.createNodes(this.doc, this.buffer, this.scene as any, prefab.data, nodeMapList, componentMapList);
+        for (const meshMap of componentMapList.meshList) {
+            const mesh = Cocos2Gltf.createMesh(this.doc, this.buffer, meshMap.meshRenderer);
             meshMap.node.setMesh(mesh);
             if (meshMap.meshRenderer instanceof cc.SkinnedMeshRenderer && meshMap.meshRenderer.skeleton) {
-                const skin = Cocos2Gltf.createSkin(doc, buffer, meshMap.meshRenderer, scene as any)
+                const skin = Cocos2Gltf.createSkin(this.doc, this.buffer, meshMap.meshRenderer, this.scene as any)
                 meshMap.node.setSkin(skin);
             }
         }
-        return doc;
+
+        return this;
     }
 
-    private static createNodes(doc: Document, buffer: Buffer, parent: Node, cocosParent: cc.Node, nodeMap: Map<cc.Node, Node>, meshMapList: IMeshMap[]): void {
+    public parserAnimatioOfPrefab(prefab: cc.Prefab): this {
+        const animation = prefab.data.getComponent(cc.Animation);
+        if (animation != null && animation.clips.length > 0)
+            Cocos2Gltf.createAnimations(this.doc, this.buffer, animation.clips, this.scene as any);
+        return this;
+    }
+
+    private static createNodes(doc: Document, buffer: Buffer, parent: Node, cocosParent: cc.Node, nodeMap: Map<cc.Node, Node>, componentMapList: IComponentMap): void {
         for (const cocosNode of cocosParent.children) {
             const node = doc.createNode(cocosNode.name);
             node.setTranslation(cc.Vec3.toArray([0, 0, 0], cocosNode.position));
@@ -48,10 +76,10 @@ export default class Cocos2Gltf {
             parent.addChild(node);
             nodeMap.set(cocosNode, node);
             const meshRenderer = cocosNode.getComponent(cc.MeshRenderer);
-            if (meshRenderer != null && meshRenderer.mesh) {
-                meshMapList.push({ meshRenderer, node });
-            }
-            Cocos2Gltf.createNodes(doc, buffer, node, cocosNode, nodeMap, meshMapList);
+            if (meshRenderer != null && meshRenderer.mesh)
+                componentMapList.meshList.push({ meshRenderer, node });
+
+            Cocos2Gltf.createNodes(doc, buffer, node, cocosNode, nodeMap, componentMapList);
         }
     }
 
@@ -166,16 +194,61 @@ export default class Cocos2Gltf {
         // if (meshRenderer.skinningRoot == meshRenderer.node)
         // skin.setSkeleton(node);
         for (const joint of meshRenderer.skeleton.joints) {
-            const nodeNames = joint.split("/");
-            let index = 0;
-            let jointNode = node;
-            do {
-                const children = jointNode.listChildren();
-                jointNode = children.find(c => c.getName() == nodeNames[index]);
-            } while (++index < nodeNames.length && jointNode != null);
+            let jointNode = Cocos2Gltf.findJointPathNode(joint, node);
             console.assert(jointNode != null);
             skin.addJoint(jointNode);
         }
         return skin;
+    }
+
+    private static findJointPathNode(jointPath: string, node: Node): Node {
+        const nodeNames = jointPath.split("/");
+        let index = 0;
+        let jointNode = node;
+        do {
+            const children = jointNode.listChildren();
+            jointNode = children.find(c => c.getName() == nodeNames[index]);
+        } while (++index < nodeNames.length && jointNode != null);
+        return jointNode;
+    }
+
+    private static createAnimations(doc: Document, buffer: Buffer, clips: cc.AnimationClip[], node: Node): void {
+        for (const clip of clips) {
+            Cocos2Gltf.createAnimation(doc, buffer, clip, node);
+        }
+    }
+
+    private static createAnimation(doc: Document, buffer: Buffer, clip: cc.AnimationClip, node: Node): Animation {
+        const animation = doc.createAnimation(clip.name);
+        const exoticAnimations: cc.__private._cocos_animation_exotic_animation_exotic_animation__ExoticNodeAnimation[] = clip["_exoticAnimation"]["_nodeAnimations"];
+        for (const exoticNode of exoticAnimations) {
+            for (const key of TargetPathMapKeys) {
+                const exotickTrack = exoticNode[key];
+                if (exotickTrack == null) continue;
+
+                const targetPath = TargetPathMap[key];
+                const sampler = doc.createAnimationSampler();
+                const input = doc.createAccessor(`${exoticNode.path}/${targetPath}/Input`, buffer);
+                input.setArray(exotickTrack.times);
+                input.setType("SCALAR");
+                sampler.setInput(input);
+
+                const output = doc.createAccessor(`${exoticNode.path}/${targetPath}/Output`, buffer);
+                output.setArray(exotickTrack.values._values);
+                output.setType(targetPath == "rotation" ? "VEC4" : "VEC3");
+                sampler.setOutput(output);
+                // sampler.setInterpolation('LINEAR');
+
+                const channel = doc.createAnimationChannel();
+                const pathNode = Cocos2Gltf.findJointPathNode(exoticNode.path, node);
+                channel.setTargetNode(pathNode);
+                channel.setTargetPath(targetPath);
+                channel.setSampler(sampler);
+
+                animation.addChannel(channel);
+                animation.addSampler(sampler);
+            }
+        }
+        return animation;
     }
 }

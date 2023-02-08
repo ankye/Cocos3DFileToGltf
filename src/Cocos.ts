@@ -15,8 +15,23 @@ await cc.game.init({ overrideSettings: { rendering: { renderMode: 3 } }, exactFi
 
 export namespace cocos {
 
-    export function init(rootPath: string): void {
+    export function init(rootPath: string, extensionMap?: Record<string, string>): void {
         const getUrl = function (url) { return `${rootPath}/${cc.path.basename(url)}`; }
+
+        if (extensionMap != null) {
+            cc.assetManager.pipeline.insert(function (task, done) {
+                const input = task.input;
+                for (const item of input) {
+                    const ext = extensionMap[item.uuid];
+                    if (ext != null) {
+                        item.ext = ext;
+                        item.url = cc.path.changeExtname(item.url, ext);
+                    }
+                }
+                task.output = task.input;
+                done();
+            }, 1);
+        }
 
         function downloadImage(url: string, options: any, callback: (error: Error, data?: any) => void) {
             const image = new window.Image();
@@ -61,6 +76,17 @@ export namespace cocos {
             }
         }
 
+        function downloadCCONB(url: string, options: any, callback: (error: Error, data?: any) => void) {
+            try {
+                const arrayBuffer = io.readBinaryFileSync(getUrl(url));
+                // @ts-ignore
+                const ccon = cc.internal.decodeCCONBinary(new Uint8Array(arrayBuffer));
+                callback(null, ccon);
+            } catch (error) {
+                callback(error);
+            }
+        }
+
         function downloadDefault(url: string, options: any, callback: (error: Error, data?: any) => void) {
             throw new Error("Unsupport download file type:" + url);
         }
@@ -95,7 +121,8 @@ export namespace cocos {
             '.dbbin': downloadArrayBuffer,
             '.skel': downloadArrayBuffer,
 
-            '.cconb': downloadDefault,
+            '.ccon': downloadDefault,
+            '.cconb': downloadCCONB,
 
             // audio
             '.mp3': downloadDefault,
@@ -109,8 +136,8 @@ export namespace cocos {
         cc.assetManager.downloader.register(downloaders);
     }
 
-    export function loadAsset<T extends cc.Asset>(request: string): Promise<T> {
-        return new Promise((resolve, reject) => cc.assetManager.loadAny<T>(request, function (err, data) {
+    export function loadAsset<T extends cc.Asset>(request: string, options?: cc.__private._cocos_asset_asset_manager_shared__IOptions): Promise<T> {
+        return new Promise((resolve, reject) => cc.assetManager.loadAny(request, options, function (err, data) {
             if (err) reject(err);
             resolve(data);
         }));
