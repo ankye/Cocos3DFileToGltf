@@ -13,6 +13,10 @@ export namespace io {
         return fs.readFileSync(filePath, "utf-8");
     }
 
+    export function fileExists(filePath: string): boolean {
+        return fs.existsSync(filePath);
+    }
+
     export function writeGltfFile(jsonDoc: JSONDocument, filename: string, filePath: string): void {
         fs.mkdirSync(filePath, { recursive: true });
         fs.writeFileSync(path.join(filePath, filename + ".gltf"), JSON.stringify(jsonDoc.json), "utf8");

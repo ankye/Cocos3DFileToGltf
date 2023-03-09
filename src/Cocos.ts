@@ -20,12 +20,18 @@ export namespace cocos {
 
         if (extensionMap != null) {
             cc.assetManager.pipeline.insert(function (task, done) {
-                const input = task.input;
-                for (const item of input) {
+                const input: cc.AssetManager.RequestItem[] = task.input;
+                for (let i = input.length - 1; i >= 0; i--) {
+                    const item = input[i];
                     const ext = extensionMap[item.uuid];
                     if (ext != null) {
                         item.ext = ext;
                         item.url = cc.path.changeExtname(item.url, ext);
+                    }
+                    const itemUrl = getUrl(item.url);
+                    if (!io.fileExists(itemUrl)) {
+                        console.log("load file failed", item.uuid + item.ext);
+                        input.splice(i, 1);
                     }
                 }
                 task.output = task.input;
