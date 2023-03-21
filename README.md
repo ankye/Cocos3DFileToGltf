@@ -19,5 +19,5 @@
 本项目是用```typescript```写的，所以直接用```ts-node```调用。
 项目中有测试资源，可以直接使用。
 ```
- ts-node src/Index.ts c2g -n paotai -c "./assets/paotai/6c51737e-2fd0-45ee-b509-7147fb4bf4ce@9112a.json" -o "./temp" 
+ ts-node src/Index.ts c2g -n cow -c "./assets/cow/6d9eaafb-f595-4cab-a0a3-c88180f98c48@1b569" -o "./temp" 
 ```

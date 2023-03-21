@@ -18,26 +18,31 @@ export namespace cocos {
     export function init(rootPath: string, extensionMap?: Record<string, string>): void {
         const getUrl = function (url) { return `${rootPath}/${cc.path.basename(url)}`; }
 
-        if (extensionMap != null) {
-            cc.assetManager.pipeline.insert(function (task, done) {
-                const input: cc.AssetManager.RequestItem[] = task.input;
-                for (let i = input.length - 1; i >= 0; i--) {
-                    const item = input[i];
-                    const ext = extensionMap[item.uuid];
-                    if (ext != null) {
-                        item.ext = ext;
-                        item.url = cc.path.changeExtname(item.url, ext);
-                    }
-                    const itemUrl = getUrl(item.url);
-                    if (!io.fileExists(itemUrl)) {
-                        console.log("load file failed", item.uuid + item.ext);
-                        input.splice(i, 1);
-                    }
+        cc.assetManager.pipeline.insert(function (task, done) {
+            const input: cc.AssetManager.RequestItem[] = task.input;
+            for (let i = input.length - 1; i >= 0; i--) {
+                const item = input[i];
+                const ext = extensionMap?.[item.uuid];
+                if (ext != null) {
+                    item.ext = ext;
+                    item.url = cc.path.changeExtname(item.url, ext);
                 }
-                task.output = task.input;
-                done();
-            }, 1);
-        }
+                let itemUrl = getUrl(item.url);
+                if (!io.fileExists(itemUrl)) {
+                    if (item.ext == ".json") {
+                        if (io.fileExists(cc.path.changeExtname(itemUrl, ".cconb"))) {
+                            item.ext = ".cconb";
+                            item.url = cc.path.changeExtname(item.url, ".cconb");
+                            break;
+                        }
+                    }
+                    console.log("load file failed", item.uuid + item.ext);
+                    input.splice(i, 1);
+                }
+            }
+            task.output = task.input;
+            done();
+        }, 1);
 
         function downloadImage(url: string, options: any, callback: (error: Error, data?: any) => void) {
             const image = new window.Image();

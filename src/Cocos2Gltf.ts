@@ -137,13 +137,16 @@ export default class Cocos2Gltf {
         const baseTexture = cocosMaterial.getProperty("mainTexture") as cc.Texture2D;
         if (baseTexture != null) {
             const texture = Cocos2Gltf.createTexture(doc, baseTexture);
-            material.setBaseColorTexture(texture);
-            Cocos2Gltf.setTextureInof(material.getBaseColorTextureInfo(), baseTexture);
+            if (texture != null) {
+                material.setBaseColorTexture(texture);
+                Cocos2Gltf.setTextureInof(material.getBaseColorTextureInfo(), baseTexture);
+            }
         }
         return material;
     }
 
     private static createTexture(doc: Document, baseTexture: cc.Texture2D): Texture {
+        if (baseTexture.image.nativeUrl == null || baseTexture.image.nativeUrl.length == 0) return null;
         const texture = doc.createTexture(baseTexture.name);
         const extnameIndex = baseTexture.image.nativeUrl.lastIndexOf(".");
         if (extnameIndex != -1) {
@@ -220,7 +223,9 @@ export default class Cocos2Gltf {
 
     private static createAnimation(doc: Document, buffer: Buffer, clip: cc.AnimationClip, node: Node): Animation {
         const animation = doc.createAnimation(clip.name);
-        const exoticAnimations: cc.__private._cocos_animation_exotic_animation_exotic_animation__ExoticNodeAnimation[] = clip["_exoticAnimation"]["_nodeAnimations"];
+        const exoticAnimations: cc.__private._cocos_animation_exotic_animation_exotic_animation__ExoticNodeAnimation[] = clip["_exoticAnimation"]?.["_nodeAnimations"];
+        if (exoticAnimations == null) return null;
+        
         for (const exoticNode of exoticAnimations) {
             for (const key of TargetPathMapKeys) {
                 const exotickTrack = exoticNode[key];

@@ -6,14 +6,17 @@ import { program } from "commander";
 
 async function convert(prefabPath: string, name: string, outPath: string) {
     const rootPath = cc.path.dirname(prefabPath);
-    cocos.init(rootPath);
     const basename = cc.path.basename(prefabPath, cc.path.extname(prefabPath));
-    const paotaiPrefab = await cocos.loadAsset<cc.Prefab>(basename);
 
-    const doc = Cocos2Gltf.convert(paotaiPrefab);
-    const gltf = await new NodeIO().writeJSON(doc);
+    cocos.init(rootPath);
 
+    const prefab = await cocos.loadAsset<cc.Prefab>(basename);
+    const converter = new Cocos2Gltf();
+    converter.parserNodeAndMesh(prefab);
+    converter.parserAnimatioOfPrefab(prefab);
+    const gltf = await new NodeIO().writeJSON(converter.doc);
     io.writeGltfFile(gltf, name ?? basename, outPath);
+    console.log("convert complete.");
 }
 
 interface ICocos2Gltf {
